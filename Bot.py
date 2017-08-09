@@ -6,10 +6,13 @@ import socket
 import urllib2
 import login
 
+CHANNEL_NAME = "jadeymew"
+BOT_NAME = 'jadeymewbot'
+
 channels = [
     'jadeymew'
 ]
-username = login.username  
+username = login.username
 oauth = login.oauth
 
 
@@ -53,15 +56,21 @@ def getmsg(msg):
 
 
 def getviews():
-    channelx = "jadeymew"
+    channelx = CHANNEL_NAME
     f = urllib2.urlopen("https://tmi.twitch.tv/group/user/%s/chatters" % (channelx,))
     data = json.loads(f.read().decode("utf-8"))
-    views = data["chatters"]["viewers"]
+    views = parse_views(data)
     sendmsg(channel, 'Current: ' + ', '.join(views))
 
 
+def parse_views(data):
+    views_with_bot = data["chatters"]["viewers"]
+    views = list(filter(lambda name: name != BOT_NAME, views_with_bot))
+    return views
+
+
 def test():
-    channelx = "jadeymew"
+    channelx = CHANNEL_NAME
     f = urllib2.urlopen("https://tmi.twitch.tv/group/user/%s/chatters" % (channelx,))
     data = json.loads(f.read().decode("utf-8"))
     views = data["chatters"]["viewers"]
