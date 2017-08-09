@@ -68,15 +68,6 @@ def parse_views(data):
     views = list(filter(lambda name: name != BOT_NAME, views_with_bot))
     return views
 
-
-def test():
-    channelx = CHANNEL_NAME
-    f = urllib2.urlopen("https://tmi.twitch.tv/group/user/%s/chatters" % (channelx,))
-    data = json.loads(f.read().decode("utf-8"))
-    views = data["chatters"]["viewers"]
-    sendwhis(user, ', '.join(views))
-
-
 def joinpatriarchy():
     with open("Viewers", 'a') as f:
         f.writelines(user + "\n")
