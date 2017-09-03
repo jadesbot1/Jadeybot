@@ -7,7 +7,7 @@ import urllib2
 import login
 
 CHANNEL_NAME = "jadeymew"
-BOT_NAME = 'jadeymewbot'
+BLOCKED_NAMES = ['jadeymewbot', 'faegwent']
 
 channels = [
     'jadeymew'
@@ -15,6 +15,54 @@ channels = [
 username = login.username
 oauth = login.oauth
 
+class PrivMsg:
+    def __init__(self, msg):
+        msg_edit = msg.split(':', 2)
+        if (len(msg_edit) > 2):
+            self.user = msg_edit[1].split('!', 1)[0]
+            self.message = msg_edit[2]
+            self.channel = msg_edit[1].split(' ', 2)[2][:-1]
+
+    def command(self):
+        return str.split(self.message)[0]
+
+    def subject(self):
+        return str.split(self.message)[1].lower()
+
+    def channel_name(self):
+        return self.channel[1:]
+
+    def handle(self):
+        if (self.command() == '!viewers' and authorise(self.user, self.channel)):
+            self.getviews()
+        elif(self.command() == '!auth' and authorise(self.user, self.channel)):
+            promote(self.subject(), self.channel)
+        elif(self.command() == '!deauth' and authorise(self.user, self.channel)):
+            demote(self.subject(), self.channel)
+        elif(self.command() == '!tiddies' and authorise(self.user, self.channel)):
+            sendmsg(self.channel, "( . Y . )")
+        elif(self.command() == '!tacos'):
+            sendmsg(self.channel, "Taco time!")
+        elif(self.command() == '!feetforpremium'):
+            sendmsg(self.channel,
+                    'Well ' + self.user + ', Have I got an offer for you... For the price of only 1 spotify premium subscription can you get 1 picture of Jadeymews heels!')
+        if self.user not in open('Viewers').read():
+            sendmsg(self.channel,
+                    'Hi ' + self.user + ', Welcome to the stream!')
+            joinpatriarchy()
+
+    def getviews(self):
+        url = "https://tmi.twitch.tv/group/user/%s/chatters" % (self.channel_name(),)
+        f = urllib2.urlopen(url)
+        data = json.loads(f.read().decode("utf-8"))
+        views = self.parse_views(data)
+        sendmsg(self.channel, 'Current: ' + ', '.join(views))
+
+    def parse_views(self, data):
+        views_with_bot = data["chatters"]["viewers"]
+        views = list(filter(lambda name: name not in BLOCKED_NAMES, views_with_bot))
+        return views
+        
 
 def ping():
     socks[0].send('PONG :pingis\n')
@@ -65,7 +113,7 @@ def getviews():
 
 def parse_views(data):
     views_with_bot = data["chatters"]["viewers"]
-    views = list(filter(lambda name: name != BOT_NAME, views_with_bot))
+    views = list(filter(lambda name: name not in BLOCKED_NAMES, views_with_bot))
     return views
 
 def joinpatriarchy():
@@ -73,6 +121,41 @@ def joinpatriarchy():
         f.writelines(user + "\n")
     f.close()
 
+def authorise(user, channel):
+    if user in open('AUTHORISED_USERS').read():
+        return True
+    else:
+        sendmsg(channel, 'Unauthorised command by ' + user)
+        return False
+
+def promote(user, channel):
+    if user not in open('AUTHORISED_USERS').read():
+        with open("AUTHORISED_USERS", 'a') as f:
+            f.writelines(user + "\n")
+        sendmsg(channel, 'Promoted user ' + user)
+    else:
+        sendmsg(channel, 'User ' + user + ' is already promoted')
+
+def demote(user, channel):
+    if user == 'jadeymew':
+        sendmsg(channel, "Hey hey, not Mira Jay!")
+        return
+    
+    authorised_users = open('AUTHORISED_USERS').read()
+    if user in authorised_users:
+        new_users = re.sub(user + '\n', '', authorised_users)
+        with open("AUTHORISED_USERS", 'r+') as f:
+            f.seek(0)
+            f.write(new_users)
+            f.truncate()
+        sendmsg(channel, 'Demoted user ' + user)
+    else:
+        sendmsg(channel, 'User ' + user + ' is not promoted')
+
+
+def handle_privmsg(msg):
+    privmsg = PrivMsg(msg)
+    privmsg.handle()
 
 socks = [socket.socket(), socket.socket()]
 socks[0].connect(('irc.twitch.tv', 6667))
@@ -81,6 +164,7 @@ socks[0].send('NICK ' + username + '\n')
 
 for val in channels:
     socks[0].send('JOIN #' + val + '\n')
+    socks[0].send('CAP REQ :twitch.tv/membership\n')
 
 print('Connected to irc.twitch.tv on port 6667')
 print('USER: ' + username)
@@ -103,25 +187,9 @@ while True:
 
         check = re.findall('@(.*).tmi.twitch.tv PRIVMSG (.*) :(.*)', msg)
         if (len(check) > 0):
-            msg_edit = msg.split(':', 2)
-            if (len(msg_edit) > 2):
-                user = msg_edit[1].split('!', 1)[0]  # User
-                message = msg_edit[2]  # Message
-                channel = msg_edit[1].split(' ', 2)[2][:-1]  # Channel
+            handle_privmsg(msg)
 
-                msg_split = str.split(message)
-
-            if (msg_split[0] == '!Viewers'):
-                getviews()
-
-            if (msg_split[0] == '!feetforpremium'):
-                sendmsg(channel,
-                        'Well ' + user + ', Have I got an offer for you... For the price of only 1 spotify premium subscription can you get 1 picture of Jadeymews heels!')
-
-            if user not in open('Viewers').read():
-                sendmsg(channel,
-                        'Hi ' + user + ', Welcome to the stream!')
-                joinpatriarchy()
+            
 
         check = re.findall('@(.*).tmi.twitch.tv WHISPER (.*) :(.*)', msg)
         if (len(check) > 0):
